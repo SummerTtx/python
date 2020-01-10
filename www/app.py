@@ -1,7 +1,6 @@
 '''
 async web application.
 '''
-
 import logging; logging.basicConfig(level=logging.INFO)
 
 import asyncio, os, json, time
@@ -12,6 +11,8 @@ from jinja2 import Environment, FileSystemLoader
 # python的  模板引擎
 import orm
 from coroweb import add_routes, add_static
+
+
 #  **kw  表示就是形参中按照关键字传值，多余的值都给kw，且以字典*的方式呈现
 def init_jinja2(app, **kw):
     logging.info('init jinja2...')
@@ -116,9 +117,18 @@ async def init(loop):
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     add_routes(app, 'handlers')
     add_static(app)
-    srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
-    logging.info('server started at http://127.0.0.1:9000...')
-    return srv
+
+    # srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
+    # logging.info('server started at http://127.0.0.1:9000...')
+    # return srv
+    
+    # 新写法
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '127.0.0.1', 9000)     #这三句处理警告
+    logging.info('server started at 127.0.0.1:9000...')
+    await site.start()
+
 # get_event_loop获取时间循环
 # run_until_complete在时间循环中，载入任务，驱动协程运行完毕
 # 不接受参数，会一直调用 _run_once() 执行，直到 _stopping 值为 True 时停止循环。
