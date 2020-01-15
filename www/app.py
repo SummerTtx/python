@@ -8,9 +8,12 @@ from datetime import datetime
 
 from aiohttp import web
 from jinja2 import Environment, FileSystemLoader  
+
+from config import configs
 # python的  模板引擎
 import orm
 from coroweb import add_routes, add_static
+from handlers import cookie2user, COOKIE_NAME
 
 
 #  **kw  表示就是形参中按照关键字传值，多余的值都给kw，且以字典*的方式呈现
@@ -43,6 +46,25 @@ async def logger_factory(app, handler):
         return (await handler(request))
     return logger
 
+    # 登录
+@asyncio.coroutine
+def auth_factory(app, handler):
+    @asyncio.coroutine
+    def auth(request):
+        logging.info('check user: %s %s' % (request.method, request.path))
+        request.__user__ = None
+        cookie_str = request.cookies.get(COOKIE_NAME)
+        if cookie_str:
+            user = yield from cookie2user(cookie_str)
+            if user:
+                logging.info('set current user: %s' % user.email)
+                request.__user__ = user
+        if request.path.startswith('/manage/') and (request.__user__ is None or not request.__user__.admin):
+            return web.HTTPFound('/signin')
+        return (yield from handler(request))
+    return auth
+
+    
 async def data_factory(app, handler):
     async def parse_data(request):
         if request.method == 'POST':
@@ -109,29 +131,45 @@ def datetime_filter(t):
 
 
 # 把@asyncio.coroutine(协程装饰器)替换为async；把yield from替换为await。
-async def init(loop):
-    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='root', password='canada0802', db='awesome')
-    app = web.Application(loop=loop, middlewares=[
-        logger_factory, response_factory
-    ])
-    init_jinja2(app, filters=dict(datetime=datetime_filter))
-    add_routes(app, 'handlers')
-    add_static(app)
+# async def init(loop):
+#     await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='root', password='canada0802', db='awesome')
+#     app = web.Application(loop=loop, middlewares=[
+#         logger_factory,auth_factory, response_factory
+#     ])
+#     init_jinja2(app, filters=dict(datetime=datetime_filter))
+#     add_routes(app, 'handlers')
+#     add_static(app)
 
     # srv = await loop.create_server(app.make_handler(), '127.0.0.1', 9000)
     # logging.info('server started at http://127.0.0.1:9000...')
     # return srv
-    
+
     # 新写法
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '127.0.0.1', 9000)     #这三句处理警告
-    logging.info('server started at 127.0.0.1:9000...')
-    await site.start()
+    # runner = web.AppRunner(app)
+    # await runner.setup()
+    # site = web.TCPSite(runner, '127.0.0.1', 9000)     #这三句处理警告
+    # logging.info('server started at 127.0.0.1:9000...')
+    # await site.start()
 
 # get_event_loop获取时间循环
 # run_until_complete在时间循环中，载入任务，驱动协程运行完毕
 # 不接受参数，会一直调用 _run_once() 执行，直到 _stopping 值为 True 时停止循环。
+
+
+
+# day10
+@asyncio.coroutine
+def init(loop):
+    yield from orm.create_pool(loop=loop, **configs.db)
+    app = web.Application(loop=loop, middlewares=[
+        logger_factory, auth_factory, response_factory
+    ])
+    init_jinja2(app, filters=dict(datetime=datetime_filter))
+    add_routes(app, 'handlers')
+    add_static(app)
+    srv = yield from loop.create_server(app.make_handler(), '127.0.0.1', 9000)
+    logging.info('server started at http://127.0.0.1:9000...')
+    return srv
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(init(loop))

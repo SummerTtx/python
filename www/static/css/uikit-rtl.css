@@ -1861,7 +1861,7 @@ select.uk-form-width-xsmall {
 /*
  * Make `input` element clickable through icon, e.g. if it's a `span`
  */
-.uk-form-icon:not(a):not(button):not(input) {
+.uk-form-icon :not(a):not(button):not(input) {
   pointer-events: none;
 }
 /*
