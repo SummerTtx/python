@@ -20,6 +20,11 @@ from config import configs
 COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs.session.secret
 
+# 获取用户信息...
+def check_admin(request):
+    if request.__user__ is None or not request.__user__.admin:
+        raise APIPermissionError()
+
 # 计算加密cookie:
 def user2cookie(user, max_age):
     # build cookie string by: id-expires-sha1
@@ -69,6 +74,21 @@ def index(request):
         'blogs': blogs
     }
     #跳转页面 
+
+# 日志页面
+@get('/blog/{id}')
+def get_blog(id):
+    blog = yield from Blog.find(id)
+    comments = yield from Comment.findAll('blog_id=?', [id], orderBy='created_at desc')
+    for c in comments:
+        c.html_content = text2html(c.content)
+    blog.html_content = markdown2.markdown(blog.content)
+    return {
+        '__template__': 'blog.html',
+        'blog': blog,
+        'comments': comments
+    }
+
 @get('/register')
 def register():
     return {
@@ -80,16 +100,26 @@ def signin():
     return {
         '__template__': 'signin.html'
     }
-# 身份验证
+@get('/manage/blogs/create')
+def manage_create_blog():
+    return {
+        '__template__': 'manage_blog_edit.html',
+        'id': '',
+        'action': '/api/blogs'
+    }
+
+_RE_EMAIL = re.compile(r'^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$')
+_RE_SHA1 = re.compile(r'^[0-9a-f]{40}$')
+# 身份验证  登录时候
 @post('/api/authenticate')
 def authenticate(*, email, passwd):
     if not email:
-        raise APIValueError('email', 'Invalid email.')
+        raise APIValueError('email', '填邮箱')
     if not passwd:
-        raise APIValueError('passwd', 'Invalid password.')
+        raise APIValueError('passwd', '填密码')
     users = yield from User.findAll('email=?', [email])
     if len(users) == 0:
-        raise APIValueError('email', 'Email not exist.')
+        raise APIValueError('email', '没有找到该邮箱')
     user = users[0]
     # check passwd:
     sha1 = hashlib.sha1()
@@ -118,7 +148,7 @@ def signout(request):
 
 _RE_EMAIL = re.compile(r'^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$')
 _RE_SHA1 = re.compile(r'^[0-9a-f]{40}$')
-
+# 注册时候
 @post('/api/users')
 def api_register_user(*, email, name, passwd):
     if not name or not name.strip():
@@ -141,9 +171,21 @@ def api_register_user(*, email, name, passwd):
     r.content_type = 'application/json'
     r.body = json.dumps(user, ensure_ascii=False).encode('utf-8')
     return r
-# @get('/api/users')
-# def api_get_users():
-#     users = yield from User.findAll(orderBy='created_at desc')
-#     for u in users:
-#         u.passwd = '******'
-#     return dict(users=users)
+
+@get('/api/blogs/{id}')
+def api_get_blog(*, id):
+    blog = yield from Blog.find(id)
+    return blog
+
+@post('/api/blogs')
+def api_create_blog(request,*, name, summary, content):
+    check_admin(request)
+    if   not  name  or  not  name.strip():
+        raise  APIValueError('name','请填写名字')
+    if   not  summary  or  not  summary.strip():
+        raise  APIValueError('summary','请填写摘要')
+    if   not  content  or  not  content.strip():
+        raise  APIValueError('content','请填写内容')
+    blog= Blog(user_id=request.__user__.id, user_name=request.__user__.name, user_image=request.__user__.image, name=name.strip(), summary=summary.strip(), content=content.strip())
+    yield from  blog.save()
+    return  blog
