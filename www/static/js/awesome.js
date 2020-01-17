@@ -299,9 +299,10 @@ $(function () {
     });
 });
 
-// ajax submit form:
+// ajax submit form:   请求
 
 function _httpJSON(method, url, data, callback) {
+    // debugger
     var opt = {
         type: method,
         dataType: 'json'
@@ -358,6 +359,7 @@ if (typeof(Vue)!=='undefined') {
         return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate() + ' ' + d.getHours() + ':' + d.getMinutes();
     });
     Vue.component('pagination', {
+        props: ['page'],
         template: '<ul class="uk-pagination">' +
                 '<li v-if="! has_previous" class="uk-disabled"><span><i class="uk-icon-angle-double-left"></i></span></li>' +
                 '<li v-if="has_previous"><a v-attr="onclick:\'gotoPage(\' + (page_index-1) + \')\'" href="#0"><i class="uk-icon-angle-double-left"></i></a></li>' +

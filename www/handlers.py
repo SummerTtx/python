@@ -17,6 +17,8 @@ from apis import APIValueError, APIResourceNotFoundError
 
 from models import User, Comment, Blog, next_id
 from config import configs
+
+from apis import Page, APIValueError, APIResourceNotFoundError    #引入分页api
 COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs.session.secret
 
@@ -189,3 +191,39 @@ def api_create_blog(request,*, name, summary, content):
     blog= Blog(user_id=request.__user__.id, user_name=request.__user__.name, user_image=request.__user__.image, name=name.strip(), summary=summary.strip(), content=content.strip())
     yield from  blog.save()
     return  blog
+# 删除  调用 orm中的 remove
+@post('/api/blogs/delete')
+def api_delete_blog(request,*, id):
+    check_admin(request)
+    if   not  id  or  not  id.strip():
+        raise  APIValueError('id','请选择')
+    blog= Blog(user_id=request.__user__.id, user_name=request.__user__.name, user_image=request.__user__.image, id=id.strip())
+    yield from  blog.remove()
+    return  blog
+
+def get_page_index(page_str):
+    p = 1
+    try:
+        p = int(page_str)
+    except ValueError as e:
+        pass
+    if p < 1:
+        p = 1
+    return p
+# blog分页查询
+@get('/api/blogs')
+def api_blogs(*, page='1'):
+    page_index = get_page_index(page)
+    num = yield from Blog.findNumber('count(id)')
+    p = Page(num, page_index)
+    if num == 0:
+        return dict(page=p, blogs=())
+    blogs = yield from Blog.findAll(orderBy='created_at desc', limit=(p.offset, p.limit))
+    return dict(page=p, blogs=blogs)
+
+@get('/manage/blogs')
+def manage_blogs(*, page='1'):
+    return {
+        '__template__': 'manage_blogs.html',
+        'page_index': get_page_index(page)
+    }
