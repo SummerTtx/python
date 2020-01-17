@@ -137,13 +137,13 @@ def authenticate(*, email, passwd):
     return r
 
 
-# 登出
+# 登出  删除cookie
 @get('/signout')
 def signout(request):
     referer = request.headers.get('Referer')
     r = web.HTTPFound(referer or '/')
     r.set_cookie(COOKIE_NAME, '-deleted-', max_age=0, httponly=True)
-    logging.info('user signed out.')
+    logging.info('用户退出')
     return r
 
 _RE_EMAIL = re.compile(r'^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$')
