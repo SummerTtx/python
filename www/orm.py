@@ -26,7 +26,7 @@ def create_pool(loop, **kw):
         minsize=kw.get('minsize', 1),
         loop=loop
     )
-# 执行select语句
+# 执行select语句ok
 @asyncio.coroutine
 def select(sql, args, size=None):
     log(sql, args)
